@@ -1,3 +1,6 @@
+*.csv filter=lfs diff=lfs merge=lfs -text
+ filter=lfs diff=lfs merge=lfs -text
+*.lst filter=lfs diff=lfs merge=lfs -text
 data/Useless/phishing_data.csv filter=lfs diff=lfs merge=lfs -text
 data/Useless/ALL-phishing-links.lst filter=lfs diff=lfs merge=lfs -text
 data/final_data.csv filter=lfs diff=lfs merge=lfs -text
