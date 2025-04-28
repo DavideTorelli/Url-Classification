@@ -6,7 +6,7 @@ https://github.com/bfilar/URLTran
 Il paper originale di URLTran è disponibile qui:
 https://arxiv.org/pdf/2106.05256
 
-ATTENZIONE: Per utilizzare il progetto è necessario essere loggati su Hugging face e aver inserito il proprio token (READ)
+ATTENZIONE: Per utilizzare il modello "bert-base-uncased" è necessario essere loggati su Hugging face e aver inserito il proprio token (READ)
 https://huggingface.co/docs/transformers/task_summary
 
 
