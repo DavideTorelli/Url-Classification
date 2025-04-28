@@ -1,58 +1,68 @@
 import torch
 from sklearn.metrics import accuracy_score, f1_score
 from torch.utils.data import DataLoader
-from transformers import AutoConfig, AutoModelForSequenceClassification, BertTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 import data_prep
 
-model_ckpt = "URLTran-BERT"
-config = AutoConfig.from_pretrained(model_ckpt)
-config.num_labels = 2
-config.problem_type = "single_label_classification"
+# === CONFIGURAZIONE ===
+model_ckpt = "bert-base-uncased"
+batch_size = 128
+epochs = 10
+learning_rate = 1e-4
+data_path = "data/final_data.csv"
 
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, config=config)
-
+# === DEVICE ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# === MODELLO E TOKENIZER ===
+tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
+model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, num_labels=2)
+
+# === FUNZIONI ===
 
 def predict(url, tokenizer, model):
-    inputs = data_prep.preprocess(url, tokenizer)
-    return torch.argmax(torch.softmax(model(**inputs).logits, dim=1)).tolist()
-
+    model.eval()
+    inputs = data_prep.preprocess([url], tokenizer)
+    inputs = {k: v.to(device) for k, v in inputs.items() if k in ["input_ids", "attention_mask"]}
+    with torch.no_grad():
+        logits = model(**inputs).logits
+    return torch.argmax(torch.softmax(logits, dim=1)).item()
 
 def train_model(train_dataset, model):
-    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-
-    # model training
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     model.to(device)
     model.train()
 
-    # initialize optimizer
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-    epochs = 10
     for epoch in range(epochs):
+        total_loss = 0
         for batch in train_loader:
+            # Importante: escludere mlm_labels
+            inputs = {k: v.to(device) for k, v in batch.items() if k not in ["label", "mlm_labels"]}
+            labels = batch["label"].to(device)
+
             optimizer.zero_grad()
-            # prep data for predict step
-            inputs = batch["input_ids"]
-            labels = batch["label"]
-            X = inputs.to("cpu")
-            y = labels.to("cpu")
-
-            outputs = model(X, labels=y)
-
+            outputs = model(**inputs, labels=labels)
             loss = outputs.loss
             loss.backward()
             optimizer.step()
 
-        print(f"Epoch: {epoch} Loss: {loss.item()}")
-        model.save_pretrained(f"models/URLTran-BERT-CLS-{epoch}")
+            total_loss += loss.item()
+
+        avg_loss = total_loss / len(train_loader)
+        print(f"Epoch {epoch+1}/{epochs}: Average Loss = {avg_loss:.4f}")
+
+        # Salva modello e tokenizer ad ogni epoca
+        save_path = f"models/BERT-URL-CLS-{epoch+1}"
+        model.save_pretrained(save_path)
+        tokenizer.save_pretrained(save_path)
+        print(f"Modello salvato in {save_path}")
 
 
-def eval_model(eval_dataset, tokenizer, model):
-    eval_loader = DataLoader(eval_dataset, batch_size=2000, shuffle=True)
+def eval_model(eval_dataset, model):
+    eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=False)
 
     y_true = []
     y_pred = []
@@ -60,28 +70,23 @@ def eval_model(eval_dataset, tokenizer, model):
     model.eval()
     with torch.no_grad():
         for batch in eval_loader:
-            inputs = batch["input_ids"]
-            labels = batch["label"]
-            X_eval = inputs.to("cpu")
-            y_eval = labels.to("cpu")
+            inputs = {k: v.to(device) for k, v in batch.items() if k not in ["label", "mlm_labels"]}
+            labels = batch["label"].to(device)
 
-            outputs = model(X_eval, labels=y_eval)
-            predictions = [
-                torch.argmax(pred).tolist()
-                for pred in torch.softmax(outputs.logits, dim=1)
-            ]
+            logits = model(**inputs).logits
+            preds = torch.argmax(torch.softmax(logits, dim=1), dim=1)
 
-            y_eval_true = y_eval.tolist()
+            y_true.extend(labels.tolist())
+            y_pred.extend(preds.tolist())
 
-            y_true.extend(y_eval_true)
-            y_pred.extend(predictions)
-
-        total_acc = accuracy_score(y_true, y_pred)
-        total_f1 = f1_score(y_true, y_pred)
-        print(f"Acc: {total_acc} F1: {total_f1}")
+    acc = accuracy_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    print(f"Evaluation Results - Accuracy: {acc:.4f}, F1 Score: {f1:.4f}")
 
 
+# === MAIN ===
 if __name__ == "__main__":
-    data_path = "data/final_data.csv"
+    print("Caricamento dataset...")
     dataset = data_prep.URLTranDataset(data_path, tokenizer)
+    print("Inizio training...")
     train_model(dataset, model)
