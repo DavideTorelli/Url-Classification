@@ -6,6 +6,9 @@ https://github.com/bfilar/URLTran
 Il paper originale di URLTran è disponibile qui:
 https://arxiv.org/pdf/2106.05256
 
+ATTENZIONE: Per utilizzare il progetto è necessario essere loggati su Hugging face e aver inserito il proprio token (READ)
+https://huggingface.co/docs/transformers/task_summary
+
 
 Questo progetto utilizza modelli di transformers (come BERT) per:
 - Classificare URL come benigni o maligni
@@ -39,7 +42,6 @@ Funzionalità principali:
   4 Prepara anche i dati per il masked language modeling (mlm_labels) se necessario.
   5 Contiene una funzione masking_step per mascherare casualmente token durante il training MLM.
 
-
 3. mlm.py
 Cosa fa: Allena un modello BERT su Masked Language Modeling (MLM) usando URL.
 Obiettivo: Migliorare il modello facendogli "completare" parti mancanti degli URL.
@@ -55,7 +57,6 @@ Funzionalità principali:
   1 Carica il modello salvato dopo il training.
   2 Chiede all'utente un URL.
   3 Fornisce la predizione (Benign o Malicious) con un livello di confidenza.
-
 
 5. data/final_data.csv
 Cosa contiene: Il dataset usato per allenare i modelli.
